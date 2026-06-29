@@ -1,4 +1,4 @@
-# A-project-about-A-Share-T-0-Algorithm-Construction-and-Optimization
+# A project about A Share T-0 Algorithm Construction and Optimization
    # 中芯国际(688981)量化交易模型 - 完整流程使用指南
 
 ## 概述
