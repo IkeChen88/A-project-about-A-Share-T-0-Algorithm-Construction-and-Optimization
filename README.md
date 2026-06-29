@@ -40,9 +40,9 @@ pip install akshare
 python scripts/complete_pipeline.py --stock_code 688981 --data_source auto
 ```
 
-## 详细说明
+# 详细说明
 
-### 文件说明
+
 ## 项目结构
 
 ```
@@ -406,29 +406,5 @@ A: 减少序列长度或样本量，或使用更小的模型。
 2. 依赖包已安装
 3. 有足够的磁盘空间和内存
 
-## 文件速查
-
-```
-quant train 1/
-├── config/
-│   ├── settings.py              # 全局配置
-│   └── model_config.py          # 模型配置
-├── data/
-│   ├── data_source.py           # 数据源（新增）
-│   ├── data_loader.py           # 数据加载（已更新）
-│   ├── indicators.py            # 技术指标
-│   ├── feature_engineering.py   # 特征工程
-│   ├── feature_selection.py     # 特征选择
-│   └── time_series.py           # 时间序列构建
-├── models/
-│   ├── lstm_model.py            # LSTM模型
-│   ├── base_model.py            # 基础模型
-│   └── explainability.py        # 可解释性分析
-├── scripts/
-│   ├── run_complete_pipeline.py  # 简化版完整流程（推荐）
-│   └── complete_pipeline.py     # 完整版（含数据获取）
-├── output/                      # 已处理好的数据
-└── requirements.txt             # 依赖包
-```
 
 祝使用愉快！
