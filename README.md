@@ -40,9 +40,6 @@ pip install akshare
 python scripts/complete_pipeline.py --stock_code 688981 --data_source auto
 ```
 
-# 详细说明
-
-
 ## 项目结构
 
 ```
