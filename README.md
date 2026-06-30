@@ -79,72 +79,7 @@ quant train 1/
 │   └── sequences/                   # X_train/y_train/X_val/y_val/X_test/y_test.npy
 └── requirements.txt
 ```
-```
 
-### 特征工程
-
-项目包含完整的技术指标：
-
-**趋势指标：**
-- MA均线（5/10/20/60周期）
-- EMA指数移动平均
-- MACD指标
-- BOLL布林带
-
-**动量指标：**
-- RSI相对强弱指标
-- KDJ指标
-- CCI指标
-- ROC变动率
-
-**成交量指标：**
-- OBV能量潮
-- VWAP成交量加权平均价
-
-**波动率指标：**
-- ATR平均真实波幅
-- 历史波动率
-
-### 模型配置
-
-## 模型架构
-
-| 模型 | 特点 |
-|------|------|
-| **LSTM** | 残差连接 + 批归一化 + Dropout，支持双向 LSTM |
-| **Transformer-LSTM** | 多头自注意力 + 位置编码 + LSTM 时序建模 |
-| **CNN** | 1D 卷积 + 残差 CNN 块，用于时序特征提取 |
-| **MLP** | 残差全连接块，作为基线对比 |
-| **Ensemble** | 加权平均 / Stacking / 可学习权重集成 |
-
-### 共同特性
-
-- **残差连接**（ResidualLSTMBlock / ResidualBlock / ResidualCNNBlock）
-- **批量归一化**（BatchNormalization / LayerNormalization）
-- **Dropout 防过拟合**
-- **Xavier (GlorotUniform) + 正交 (Orthogonal) 初始化**
-- **BCE 损失函数 + Adam 优化器**
-- **早停机制**，监控验证集 AUC
-- **学习率自适应衰减**（ReduceLROnPlateau）
-
-## 快速开始
-
-```bash
-# 安装依赖
-pip install -r requirements.txt
-
-# 快速训练 LSTM
-python scripts/train_final.py
-
-# 训练 Transformer-LSTM + Optuna 优化
-python scripts/train_final.py --model_type transformer_lstm --optimize --n_trials 20
-
-# 对比所有模型（自动 Optuna 优化 + 训练 + 评估）
-python scripts/train_final.py --compare_models --n_trials 30
-
-# 使用可学习权重的集成模型
-python scripts/train_final.py --use_ensemble
-```
 ## 使用指南
 
 ### 1. 数据准备
@@ -289,12 +224,30 @@ python scripts/train_final.py [OPTIONS]
 ```python
 STOCK_CODE = "688981"      # 股票代码
 TIMEFRAME = "5m"           # K 线周期
-SEQUENCE_LENGTH = 20       # 输入序列长度（20 根 K 线）
-TARGET_PERIOD = 1          # 预测未来 1 个周期
+SEQUENCE_LENGTH = 20       # 输入序列长度（20 根 K 线 = 100 分钟）
+TARGET_PERIOD = 6          # 预测未来 6 个周期（30 分钟）
 TRAIN_RATIO = 0.7          # 训练集比例
 ```
 
-编辑 `config/model_config.py` 修改各模型的默认超参数。
+编辑 `config/model_config.py` 修改各模型的默认超参数：
+
+```python
+# 当前最优默认配置
+dropout_rate = 0.4          # Dropout 防过拟合
+l2_reg = 1e-3               # L2 正则化
+bidirectional = False       # 单向 LSTM（双向在小数据集上易过拟合）
+clipnorm = 1.0              # 梯度裁剪
+use_focal_loss = False      # 可选 Focal Loss
+```
+
+## 优化历程
+
+| 阶段 | 改动 | LSTM Test AUC | 变化 |
+|------|------|:---:|:---:|
+| 0 | 基线：TARGET=1（5min）, 33 特征, 单向 LSTM | 0.488 | - |
+| 1 | TARGET_PERIOD=6（30min 预测） | 0.494 | +0.006 |
+| 2 | + 增强特征（37 特征：量价背离/波动率/滞后） | **0.533** | **+0.039** |
+| 3 | + 双向 LSTM + 强正则化 + Gradient Clipping | 0.507 | -0.026 |
 
 ## 依赖
 
