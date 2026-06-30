@@ -39,14 +39,33 @@ pip install akshare
 # 运行完整数据获取与分析流程
 python scripts/complete_pipeline.py --stock_code 688981 --data_source auto
 ```
+## 模型架构
+
+| 模型 | 特点 |
+|-------|----------|
+| **LSTM** | 残差连接 + 批归一化 + Dropout，支持双向 |
+| **Transformer-LSTM** | 多头自注意力 + 位置编码 + LSTM 时序建模 |
+| **CNN** | 1D 卷积 + 残差 CNN 块 |
+| **MLP** | 残差全连接块（基线模型） |
+| **Ensemble** | 加权平均 / Stacking 集成 |
+
+### 共同特性
+
+- 残差连接（ResidualLSTMBlock / ResidualBlock / ResidualCNNBlock）
+- 批量归一化 + 层归一化
+- Dropout + L2 正则化
+- Xavier (GlorotUniform) + 正交 (Orthogonal) 初始化
+- BCE 损失函数（可选 Focal Loss）+ Adam 优化器
+- 早停机制（监控 val_auc）
+- 学习率自适应衰减（ReduceLROnPlateau）
 
 ## 项目结构
 
 ```
 quant train 1/
 ├── config/
-│   ├── settings.py                  # 全局配置（股票代码、时间周期等）
-│   └── model_config.py              # 模型配置 dataclass（LSTM/Transformer/CNN/MLP/Ensemble）
+│   ├── settings.py                  # 全局配置（股票代码、K线周期等）
+│   └── model_config.py              # 模型超参数配置
 ├── data/
 │   ├── data_loader.py               # 数据加载
 │   ├── data_helper.py               # 数据辅助（加载/标准化）
@@ -55,30 +74,42 @@ quant train 1/
 │   ├── feature_selection.py         # 特征选择
 │   └── time_series.py               # 时间序列构建
 ├── models/
-│   ├── base_model.py                # 基类：编译/训练/评估/早停/保存
-│   ├── lstm_model.py                # LSTM 模型
-│   ├── transformer_lstm.py          # Transformer-LSTM 混合模型
-│   ├── cnn_model.py                 # CNN 模型
-│   ├── mlp_model.py                 # MLP 基线模型
-│   ├── ensemble_model.py            # 集成模型（加权/Stacking/可学习权重）
-│   ├── layers.py                    # 自定义层（自注意力/位置编码/残差块/可学习集成权重）
-│   ├── initializers.py              # 权重初始化器
-│   ├── trainer.py                   # 模型训练器（多模型管理 + Optuna 自动选模）
-│   ├── ts_cross_validation.py       # 时间序列 Walk-Forward 交叉验证
-│   ├── hyperparameter_optimizer.py  # Optuna 超参数优化（支持 4 种模型类型）
-│   ├── explainability.py            # 模型可解释性（SHAP）
-│   └── explainability_visualization.py
+│   ├── models/                      # 模型架构
+│   │   ├── base_model.py            # 基类：编译/训练/评估
+│   │   ├── lstm_model.py            # LSTM 模型
+│   │   ├── transformer_lstm.py      # Transformer-LSTM
+│   │   ├── cnn_model.py             # CNN 模型
+│   │   ├── mlp_model.py             # MLP 模型
+│   │   ├── ensemble_model.py        # 集成模型
+│   │   ├── trainer.py               # 多模型训练器
+│   │   ├── layers.py                # 自定义层
+│   │   └── initializers.py          # 权重初始化
+│   ├── visualization/               # 可视化包
+│   │   ├── base.py                  # 基类
+│   │   ├── training.py              # 训练曲线
+│   │   ├── prediction.py            # 预测图
+│   │   ├── performance.py           # 性能对比
+│   │   ├── feature_importance.py    # 特征重要性
+│   │   ├── shap_plots.py            # SHAP 可解释性
+│   │   ├── strategy.py              # 策略回测
+│   │   ├── price_prediction.py      # 价格预测
+│   │   ├── architecture.py          # 模型架构图
+│   │   └── report.py                # 报告编排器
+│   ├── hyperparameter_optimizer.py  # Optuna 超参数优化
+│   ├── ts_cross_validation.py       # 时间序列交叉验证
+│   └── explainability.py            # SHAP 分析
+├── utils/
+│   └── metrics.py                   # 绩效指标 + 风控管理
 ├── scripts/
-│   ├── train_final.py               # 完整训练脚本（支持 --model_type / --compare_models / --use_ensemble）
-│   ├── complete_pipeline.py         # 端到端流水线（数据→特征→训练→SHAP）
-│   ├── quick_train.py               # 快速训练
-│   └── simple_train.py              # 最简训练
-├── output/                          # 预处理好的数据
+│   ├── price_prediction_plot.py     # 价格预测四子图
+│   ├── multi_model_plot.py          # 多模型对比图
+│   └── performance_report.py        # 绩效指标 + 风控报告
+├── output/                          # 预处理数据
 │   ├── processed_data.parquet
 │   ├── selected_features.csv
-│   └── sequences/                   # X_train/y_train/X_val/y_val/X_test/y_test.npy
+│   └── sequences/                   # X_train/y_train 等 .npy 文件
+├── visualization_results/           # 生成的图表和 CSV
 └── requirements.txt
-```
 
 ## 使用指南
 
@@ -199,7 +230,56 @@ results = cv.cross_validate(model_builder, X_train, y_train, X_val, y_val)
 print(f"AUC Mean: {results['summary']['auc_mean']:.4f}")
 print(f"AUC Std:  {results['summary']['auc_std']:.4f}")
 ```
+### 7. 绩效指标
 
+```python
+from utils.metrics import compute_all_metrics
+
+metrics = compute_all_metrics(strategy_returns)
+# 返回：夏普比率、索提诺比率、最大回撤、Calmar比率、胜率、盈亏比等
+```
+
+| 指标 | 说明 |
+|------|------|
+| **夏普比率 (Sharpe)** | 年化超额收益 / 波动率，衡量风险调整后收益 |
+| **索提诺比率 (Sortino)** | 类似夏普，但只惩罚下行波动，更符合实际风险感知 |
+| **最大回撤 (Max Drawdown)** | 从最高点到最低点的最大跌幅 |
+| **Calmar 比率** | 年化收益 / 最大回撤绝对值，衡量单位极端风险的回报 |
+| **胜率 (Win Rate)** | 正收益周期占比 |
+| **盈亏比 (Profit Factor)** | 总盈利 / 总亏损，>1 表示盈利 |
+
+### 8. 风控机制
+
+```python
+from utils.metrics import (
+    apply_stop_loss,                  # 固定百分比止损
+    apply_trailing_stop,              # 移动止损（从最高点回撤触发）
+    apply_time_stop,                  # 持仓时间止损
+    position_probability_weighted,    # 概率→仓位映射
+    position_volatility_scaled,       # 波动率目标仓位
+    strategy_returns_with_risk_mgmt,  # 一键风控管线
+)
+
+# 完整风控管线
+results = strategy_returns_with_risk_mgmt(
+    returns=returns, signals=signals, prices=prices,
+    stop_loss_pct=0.03,         # 固定止损 3%
+    trailing_stop_pct=0.05,     # 移动止损 5%
+    use_probability_weighting=True,
+    probs=probs
+)
+# 返回四种策略收益：raw / stop_loss / trailing_stop / combined
+```
+## 风控效果对比
+
+| 策略 | 夏普 | 索提诺 | 最大回撤 | Calmar |
+|------|------|--------|----------|--------|
+| 原始信号 | 1.070 | 1.721 | -35.00% | 1.000 |
+| + 固定止损 | 1.462 | 2.354 | -26.38% | 1.773 |
+| **+ 移动止损** | **2.847** | **4.870** | **-11.42%** | **7.330** |
+| + 组合风控 | 2.189 | 3.003 | -7.16% | 3.615 |
+
+> 最佳策略为**移动止损**：夏普比率提升 **+166%**，最大回撤从 -35% 降至 **-11.4%**。
 ## 命令行参数
 
 ```bash
