@@ -110,7 +110,7 @@ quant train 1/
 │   └── sequences/                   # X_train/y_train 等 .npy 文件
 ├── visualization_results/           # 生成的图表和 CSV
 └── requirements.txt
-
+```
 ## 使用指南
 
 ### 1. 数据准备
